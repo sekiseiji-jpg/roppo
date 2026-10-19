@@ -1,0 +1,17 @@
+{
+  "name": "六法全書",
+  "short_name": "六法",
+  "description": "憲法・民法・刑法・商法・会社法・民事訴訟法・刑事訴訟法の条文を読んで検索でき、重要条文をクイズで覚えられるアプリ",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f6fa",
+  "theme_color": "#35497e",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

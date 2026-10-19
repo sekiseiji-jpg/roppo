@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#35497e">
+  <meta name="description" content="憲法・民法・刑法・商法・会社法・民事訴訟法・刑事訴訟法の条文を読んで検索でき、重要条文をクイズで覚えられるアプリ">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="六法">
+  <title>六法全書</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css?v=4">
+</head>
+<body>
+  <header class="app-header">
+    <h1>⚖️ 六法全書</h1>
+    <div class="head-actions">
+      <button id="btn-jump" class="icon-btn" title="条文へジャンプ" aria-label="条文へジャンプ">🔖</button>
+      <button id="btn-settings" class="icon-btn" title="設定" aria-label="設定">⚙️</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="laws"><span class="ti">📚</span><span class="tl">六法</span></button>
+    <button class="tab" data-tab="search"><span class="ti">🔍</span><span class="tl">検索</span></button>
+    <button class="tab" data-tab="study"><span class="ti">🎓</span><span class="tl">重要条文</span></button>
+    <button class="tab" data-tab="terms"><span class="ti">📖</span><span class="tl">用語</span></button>
+    <button class="tab" data-tab="quiz"><span class="ti">📝</span><span class="tl">クイズ</span></button>
+    <button class="tab" data-tab="stats"><span class="ti">📊</span><span class="tl">記録</span></button>
+    <button class="tab" data-tab="saved"><span class="ti">⭐</span><span class="tl">保存</span></button>
+  </nav>
+
+  <main>
+    <!-- ========== 六法 ========== -->
+    <section id="tab-laws" class="panel active">
+      <!-- 法令一覧 -->
+      <div id="law-list-view">
+        <p class="lead">読みたい法律を選んでください。条文は e-Gov 法令API（デジタル庁）の公式データです。</p>
+        <div id="law-grid" class="law-grid"></div>
+        <p class="muted small" id="law-source"></p>
+      </div>
+
+      <!-- 法令の中身 -->
+      <article id="law-detail-view" class="hidden">
+        <div class="detail-bar">
+          <button id="btn-law-back" class="btn ghost">← 法令一覧</button>
+          <span class="spacer"></span>
+          <button id="btn-law-toc" class="btn ghost">📑 目次</button>
+        </div>
+        <div id="law-hero" class="law-hero"></div>
+
+        <!-- 目次 -->
+        <div id="law-toc-view">
+          <div class="card tight">
+            <div class="row wrap">
+              <input id="toc-filter" type="text" placeholder="🔍 目次をしぼりこむ（例：相続、抵当権）">
+            </div>
+          </div>
+          <div id="law-toc" class="toc"></div>
+        </div>
+
+        <!-- 条文 -->
+        <div id="law-arts-view" class="hidden">
+          <div class="section-bar">
+            <button id="btn-sec-prev" class="btn ghost" title="前の章へ">◀</button>
+            <div id="sec-title" class="sec-head"></div>
+            <button id="btn-sec-next" class="btn ghost" title="次の章へ">▶</button>
+          </div>
+          <div id="art-list"></div>
+          <div class="row">
+            <span class="spacer"></span>
+            <button id="btn-art-more" class="btn hidden">続きを表示</button>
+            <span class="spacer"></span>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 検索 ========== -->
+    <section id="tab-search" class="panel">
+      <div class="card tight">
+        <div class="row wrap">
+          <input id="sx-input" type="text" placeholder="🔍 条文を検索（例：善意の第三者、正当防衛、公共の福祉）" autocomplete="off">
+        </div>
+        <div id="sx-laws" class="filter-row"></div>
+        <div class="row wrap">
+          <label class="check"><input id="sx-cap" type="checkbox"> 見出しだけを探す</label>
+          <label class="check"><input id="sx-suppl" type="checkbox"> 附則も含める</label>
+          <span class="spacer"></span>
+          <span id="sx-count" class="muted small"></span>
+        </div>
+      </div>
+      <div id="sx-results"></div>
+    </section>
+
+    <!-- ========== 重要条文 ========== -->
+    <section id="tab-study" class="panel">
+      <div id="study-list-view">
+        <p class="lead">試験や実務でよく出てくる条文を、分野ごとにまとめました。ひとことの解説つきで読めます。</p>
+        <div id="study-law-chips" class="filter-row"></div>
+        <div id="study-grid" class="era-grid"></div>
+      </div>
+      <article id="study-detail-view" class="hidden">
+        <div class="detail-bar">
+          <button id="btn-study-back" class="btn ghost">← 分野一覧</button>
+          <span class="spacer"></span>
+          <button id="btn-study-prev" class="btn ghost" title="前の分野">◀</button>
+          <button id="btn-study-next" class="btn ghost" title="次の分野">▶</button>
+        </div>
+        <div id="study-hero" class="law-hero"></div>
+        <div id="study-body"></div>
+        <div class="row">
+          <span class="spacer"></span>
+          <button id="btn-study-quiz" class="btn primary">📝 この分野でクイズ</button>
+          <span class="spacer"></span>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 用語 ========== -->
+    <section id="tab-terms" class="panel">
+      <div class="card tight">
+        <div class="row wrap">
+          <input id="tm-input" type="text" placeholder="🔍 用語をしぼりこむ" autocomplete="off">
+        </div>
+        <div id="tm-chips" class="filter-row"></div>
+      </div>
+      <div id="tm-list" class="kw-list"></div>
+    </section>
+
+    <!-- ========== クイズ ========== -->
+    <section id="tab-quiz" class="panel">
+      <div id="quiz-setup">
+        <div class="card">
+          <strong>出題範囲</strong>
+          <div id="q-law-chips" class="filter-row"></div>
+          <strong class="mt">出題形式</strong>
+          <div id="q-type-chips" class="filter-row"></div>
+          <div class="row wrap mt">
+            <label class="inline">問題数
+              <select id="q-count">
+                <option value="5">5問</option>
+                <option value="10" selected>10問</option>
+                <option value="20">20問</option>
+                <option value="0">すべて</option>
+              </select>
+            </label>
+            <label class="check"><input id="q-weak" type="checkbox"> 苦手な問題を優先</label>
+            <span class="spacer"></span>
+            <span id="q-pool" class="muted small"></span>
+          </div>
+          <div class="row">
+            <span class="spacer"></span>
+            <button id="btn-quiz-start" class="btn primary">▶ 出題開始</button>
+          </div>
+        </div>
+        <div class="card">
+          <strong>📘 出題形式について</strong>
+          <ul class="note-list" id="type-notes"></ul>
+          <p class="muted small">問題は「重要条文」に収めた353条から、その場で作っています。</p>
+        </div>
+      </div>
+
+      <div id="quiz-play" class="hidden">
+        <div class="row">
+          <button id="btn-quiz-quit" class="btn ghost">← 設定へ</button>
+          <span class="spacer"></span>
+          <span id="q-progress" class="muted"></span>
+        </div>
+        <div class="progress-bar"><div id="q-bar"></div></div>
+        <div id="q-area"></div>
+        <div class="row">
+          <button id="btn-q-save" class="btn ghost">⭐ この問題を保存</button>
+          <span class="spacer"></span>
+          <button id="btn-q-next" class="btn primary hidden">次の問題 →</button>
+        </div>
+      </div>
+
+      <div id="quiz-result" class="hidden"></div>
+    </section>
+
+    <!-- ========== 記録 ========== -->
+    <section id="tab-stats" class="panel">
+      <div id="stat-tiles" class="tiles"></div>
+      <div class="card">
+        <strong>法令別の正答率</strong>
+        <div id="stat-law" class="bars"></div>
+      </div>
+      <div class="card">
+        <strong>分野別の正答率</strong>
+        <div id="stat-group" class="bars"></div>
+      </div>
+      <div class="card">
+        <strong>📖 読んだ分野</strong>
+        <div id="stat-read" class="read-grid"></div>
+      </div>
+      <div class="card">
+        <strong>😓 まちがえた問題トップ10</strong>
+        <ul id="stat-weak" class="list compact"></ul>
+      </div>
+      <div class="row">
+        <span class="spacer"></span>
+        <button id="btn-reset-stats" class="btn ghost">🗑️ 学習記録をリセット</button>
+      </div>
+    </section>
+
+    <!-- ========== 保存 ========== -->
+    <section id="tab-saved" class="panel">
+      <div class="subtabs">
+        <button class="savedtab active" data-sv="art">⭐ 条文</button>
+        <button class="savedtab" data-sv="memo">📝 メモ</button>
+        <button class="savedtab" data-sv="quiz">📒 問題</button>
+      </div>
+      <div id="saved-area"></div>
+    </section>
+  </main>
+
+  <!-- 条文ジャンプ -->
+  <dialog id="jump-dialog">
+    <div class="dlg">
+      <div class="row">
+        <input id="jp-input" type="text" placeholder="例：民法709 / 憲法9 / 刑法230の2" autocomplete="off">
+        <button id="jp-close" class="icon-btn">✕</button>
+      </div>
+      <p class="muted small">法令名と条番号を続けて入力してください。番号だけなら、前に開いていた法令から探します。</p>
+      <div id="jp-results" class="sd-results"></div>
+    </div>
+  </dialog>
+
+  <!-- メモ -->
+  <dialog id="memo-dialog">
+    <form method="dialog" class="dlg">
+      <h2 id="memo-title">メモ</h2>
+      <textarea id="memo-text" rows="6" placeholder="この条文についてのメモ"></textarea>
+      <div class="row">
+        <button id="memo-del" value="del" class="btn ghost">削除</button>
+        <span class="spacer"></span>
+        <button value="cancel" class="btn ghost">やめる</button>
+        <button id="memo-ok" value="ok" class="btn primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 設定 -->
+  <dialog id="settings-dialog">
+    <form method="dialog" class="dlg settings">
+      <h2>設定</h2>
+      <label class="check"><input id="set-shuffle" type="checkbox" checked> 選択肢の順番をシャッフルする</label>
+      <label class="check"><input id="set-cap" type="checkbox" checked> 条文に見出しを表示する</label>
+      <label>文字の大きさ
+        <select id="set-fontsize">
+          <option value="15">小</option>
+          <option value="16" selected>標準</option>
+          <option value="18">大</option>
+          <option value="20">特大</option>
+        </select>
+      </label>
+      <label>配色
+        <select id="set-theme">
+          <option value="auto" selected>端末に合わせる</option>
+          <option value="light">ライト</option>
+          <option value="dark">ダーク</option>
+        </select>
+      </label>
+      <div class="row">
+        <button type="button" id="set-offline" class="btn">⬇ オフライン用に全法令を保存</button>
+      </div>
+      <p class="muted small" id="set-offline-note">
+        いま開いた法令だけが端末に残ります。電波のないところで全部読むなら、先に保存しておいてください。</p>
+      <div class="row">
+        <span class="spacer"></span>
+        <button value="close" class="btn primary">閉じる</button>
+      </div>
+      <p class="muted small" id="set-about"></p>
+    </form>
+  </dialog>
+
+  <div id="update-bar" class="update-bar hidden">
+    <span>新しい版があります</span>
+    <button id="btn-update" class="btn primary">更新する</button>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="laws/index.js?v=4"></script>
+  <script src="data-study.js?v=4"></script>
+  <script src="app.js?v=4"></script>
+</body>
+</html>

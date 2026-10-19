@@ -1,0 +1,8 @@
+.DS_Store
+# macOS が別ファイルシステム上に書く付随データ（._app.js など）
+._*
+__pycache__/
+*.pyc
+
+# e-Gov APIの生データ。tools/build_laws.py で取り直せるので公開しない（7.5MB）
+raw/
