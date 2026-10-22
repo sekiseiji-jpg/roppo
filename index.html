@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
   <header class="app-header">
@@ -30,6 +30,7 @@
     <button class="tab" data-tab="study"><span class="ti">🎓</span><span class="tl">重要条文</span></button>
     <button class="tab" data-tab="terms"><span class="ti">📖</span><span class="tl">用語</span></button>
     <button class="tab" data-tab="quiz"><span class="ti">📝</span><span class="tl">クイズ</span></button>
+    <button class="tab" data-tab="exam"><span class="ti">🏛</span><span class="tl">過去問</span></button>
     <button class="tab" data-tab="stats"><span class="ti">📊</span><span class="tl">記録</span></button>
     <button class="tab" data-tab="saved"><span class="ti">⭐</span><span class="tl">保存</span></button>
   </nav>
@@ -183,6 +184,38 @@
       <div id="quiz-result" class="hidden"></div>
     </section>
 
+    <!-- ========== 過去問 ========== -->
+    <section id="tab-exam" class="panel">
+      <div id="exam-list-view">
+        <p class="lead">司法試験の短答式試験の過去問です。法務省が公表した問題と正答をそのまま収めています。</p>
+        <div class="card tight">
+          <div id="ex-year-chips" class="filter-row"></div>
+          <div id="ex-law-chips" class="filter-row"></div>
+        </div>
+        <div id="ex-grid" class="law-grid"></div>
+        <p class="muted small" id="ex-source"></p>
+      </div>
+
+      <article id="exam-play" class="hidden">
+        <div class="detail-bar">
+          <button id="btn-ex-back" class="btn ghost">← 一覧</button>
+          <span class="spacer"></span>
+          <span id="ex-score" class="muted small"></span>
+          <span id="ex-progress" class="muted small"></span>
+        </div>
+        <div class="progress-bar"><div id="ex-bar"></div></div>
+        <div id="ex-area"></div>
+        <div class="row">
+          <button id="btn-ex-save" class="btn ghost">⭐ この問題を保存</button>
+          <span class="spacer"></span>
+          <button id="btn-ex-skip" class="btn ghost">あとで</button>
+          <button id="btn-ex-next" class="btn primary hidden">次の問題 →</button>
+        </div>
+      </article>
+
+      <div id="exam-result" class="hidden"></div>
+    </section>
+
     <!-- ========== 記録 ========== -->
     <section id="tab-stats" class="panel">
       <div id="stat-tiles" class="tiles"></div>
@@ -202,6 +235,10 @@
         <strong>😓 まちがえた問題トップ10</strong>
         <ul id="stat-weak" class="list compact"></ul>
       </div>
+      <div class="card">
+        <strong>🏛 過去問の成績</strong>
+        <div id="stat-exam" class="bars"></div>
+      </div>
       <div class="row">
         <span class="spacer"></span>
         <button id="btn-reset-stats" class="btn ghost">🗑️ 学習記録をリセット</button>
@@ -214,6 +251,7 @@
         <button class="savedtab active" data-sv="art">⭐ 条文</button>
         <button class="savedtab" data-sv="memo">📝 メモ</button>
         <button class="savedtab" data-sv="quiz">📒 問題</button>
+        <button class="savedtab" data-sv="exam">🏛 過去問</button>
       </div>
       <div id="saved-area"></div>
     </section>
@@ -251,6 +289,7 @@
       <h2>設定</h2>
       <label class="check"><input id="set-shuffle" type="checkbox" checked> 選択肢の順番をシャッフルする</label>
       <label class="check"><input id="set-cap" type="checkbox" checked> 条文に見出しを表示する</label>
+      <label class="check"><input id="set-exmark" type="checkbox" checked> 過去問をその場で採点する</label>
       <label>文字の大きさ
         <select id="set-fontsize">
           <option value="15">小</option>
@@ -267,10 +306,10 @@
         </select>
       </label>
       <div class="row">
-        <button type="button" id="set-offline" class="btn">⬇ オフライン用に全法令を保存</button>
+        <button type="button" id="set-offline" class="btn">⬇ オフライン用に全法令・過去問を保存</button>
       </div>
       <p class="muted small" id="set-offline-note">
-        いま開いた法令だけが端末に残ります。電波のないところで全部読むなら、先に保存しておいてください。</p>
+        いま開いた法令と過去問だけが端末に残ります。電波のないところで全部使うなら、先に保存しておいてください（約5MB）。</p>
       <div class="row">
         <span class="spacer"></span>
         <button value="close" class="btn primary">閉じる</button>
@@ -286,8 +325,9 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="laws/index.js?v=4"></script>
-  <script src="data-study.js?v=4"></script>
-  <script src="app.js?v=4"></script>
+  <script src="laws/index.js?v=5"></script>
+  <script src="exams/index.js?v=5"></script>
+  <script src="data-study.js?v=5"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

@@ -9,6 +9,11 @@ const METAS = INDEX.laws;
 const META = {};
 METAS.forEach((m) => { META[m.key] = m; });
 window.LAWDATA = window.LAWDATA || {};
+const EXINDEX = window.EXAMS_INDEX || { sets: [], built: '', source: '' };
+const EXSETS = EXINDEX.sets || [];
+const EXSET = {};
+EXSETS.forEach((s) => { EXSET[s.key] = s; });
+window.EXAMDATA = window.EXAMDATA || {};
 
 const defaults = {
   read: {},        // groupId -> true（重要条文の分野を開いた）
@@ -21,7 +26,11 @@ const defaults = {
   sessions: [],    // {d, n, c}
   days: {},        // 日付 -> その日に解いた問題数
   lastLaw: 'kenpo',
-  set: { shuffle: true, cap: true, fontsize: 16, theme: 'auto' },
+  exstat: {},      // "setKey:問番号" -> {o: 解いた回数, x: 誤答数}
+  exbest: {},      // setKey -> {pt, full, n, c, d}（自己最高）
+  exprog: {},      // setKey -> {picks: {問番号: [選んだ値]}}（中断したところ）
+  savedExam: [],   // "setKey:問番号"
+  set: { shuffle: true, cap: true, fontsize: 16, theme: 'auto', exmark: true },
 };
 let S = load();
 
@@ -81,7 +90,7 @@ function loadLaw(key) {
   if (pending[key]) return pending[key];
   pending[key] = new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = 'laws/' + key + '.js?v=4';
+    s.src = 'laws/' + key + '.js?v=5';
     s.onload = () => (window.LAWDATA[key] ? resolve(window.LAWDATA[key]) : reject(new Error(key)));
     s.onerror = () => reject(new Error(key));
     document.head.appendChild(s);
@@ -99,6 +108,22 @@ function loadLaws(keys, onProgress) {
 }
 function findArt(law, num) { return law.articles.find((a) => a.num === num); }
 
+/* 過去問も法令と同じく、開いたセットだけを <script> で後から読む */
+const exPending = {};
+function loadExam(key) {
+  if (window.EXAMDATA[key]) return Promise.resolve(window.EXAMDATA[key]);
+  if (exPending[key]) return exPending[key];
+  exPending[key] = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'exams/' + key + '.js?v=5';
+    s.onload = () => (window.EXAMDATA[key] ? resolve(window.EXAMDATA[key]) : reject(new Error(key)));
+    s.onerror = () => reject(new Error(key));
+    document.head.appendChild(s);
+  });
+  exPending[key].catch(() => { delete exPending[key]; });
+  return exPending[key];
+}
+
 /* ========== タブ ========== */
 $$('.tab').forEach((t) => t.addEventListener('click', () => {
   $$('.tab').forEach((x) => x.classList.toggle('active', x === t));
@@ -107,6 +132,7 @@ $$('.tab').forEach((t) => t.addEventListener('click', () => {
   if (name === 'stats') renderStats();
   if (name === 'saved') renderSaved();
   if (name === 'quiz') updatePool();
+  if (name === 'exam') renderExamGrid();
   window.scrollTo({ top: 0 });
 }));
 function goTab(name) {
@@ -1105,6 +1131,7 @@ function renderStats() {
     ['正答率', pct(c, o) + '%'],
     ['連続学習', streak() + '日'],
     ['読んだ分野', Object.keys(S.read).length + ' / ' + GROUPS.length],
+    ['解いた過去問', Object.keys(S.exstat).length + ' / ' + EXSETS.reduce((n, s) => n + s.count, 0) + '問'],
     ['保存した条文', S.savedArts.length + '条'],
     ['書いたメモ', Object.keys(S.memos).length + '件'],
   ].map(([k, v]) => `<div class="tile"><div class="tv">${esc(v)}</div><div class="tk">${esc(k)}</div></div>`).join('');
@@ -1140,10 +1167,26 @@ function renderStats() {
     goTab('laws');
     openLaw(li.dataset.law, { num: li.dataset.num });
   }));
+
+  const taken = EXSETS.filter((s) => S.exbest[s.key]);
+  $('#stat-exam').innerHTML = taken.length ? taken.map((s) => {
+    const b = S.exbest[s.key];
+    const ok = b.pt >= s.pass;
+    return `<div class="bar-row" data-key="${s.key}">
+      <span class="bl">${esc(s.yearLabel)} ${esc(s.subject)}</span>
+      <div class="bar-track"><div class="${ok ? '' : 'under'}" style="width:${pct(b.pt, b.full)}%"></div></div>
+      <span class="bn">${b.pt}/${b.full}</span></div>`;
+  }).join('') + `<p class="muted small">棒は自己最高の得点です。基準点（満点の40%）に届いていないものは色を変えています。</p>`
+    : '<p class="muted small">まだ受験した過去問がありません。</p>';
+  $$('#stat-exam .bar-row[data-key]').forEach((el) => el.addEventListener('click', () => {
+    goTab('exam');
+    openExam(el.dataset.key);
+  }));
 }
 $('#btn-reset-stats').addEventListener('click', () => {
-  if (!confirm('クイズの記録と「読んだ分野」を消します。保存した条文とメモは残ります。よろしいですか？')) return;
+  if (!confirm('クイズと過去問の記録、「読んだ分野」を消します。保存した条文とメモは残ります。よろしいですか？')) return;
   S.read = {}; S.qstat = {}; S.lawstat = {}; S.groupstat = {}; S.sessions = []; S.days = {};
+  S.exstat = {}; S.exbest = {}; S.exprog = {};
   save();
   renderStats();
   toast('学習記録をリセットしました');
@@ -1161,6 +1204,31 @@ $$('.savedtab').forEach((b) => b.addEventListener('click', () => {
 
 function renderSaved() {
   const area = $('#saved-area');
+  if (savedTab === 'exam') {
+    const ids = S.savedExam;
+    if (!ids.length) {
+      area.innerHTML = '<div class="empty">保存した過去問はありません。<br>過去問を解いている間の「⭐ この問題を保存」で貯まります。</div>';
+      return;
+    }
+    area.innerHTML = ids.map((id) => {
+      const i = id.lastIndexOf(':');
+      const key = id.slice(0, i);
+      const qn = id.slice(i + 1);
+      const s = EXSET[key];
+      if (!s) return '';
+      const m = META[s.law] || {};
+      const st = S.exstat[id];
+      return `<div class="hit" style="--ec:${m.color || ''}" data-key="${key}" data-q="${esc(qn)}">
+        <div class="hit-head"><span class="hit-law">${esc(s.yearLabel)} ${esc(s.subject)}</span>
+          <span class="hit-k">第${esc(qn)}問</span>
+          ${st && st.x ? `<span class="hit-cap">${st.x}/${st.o} ミス</span>` : ''}</div></div>`;
+    }).join('');
+    $$('.hit[data-key]', area).forEach((el) => el.addEventListener('click', () => {
+      goTab('exam');
+      openExamAt(el.dataset.key, +el.dataset.q);
+    }));
+    return;
+  }
   if (savedTab === 'quiz') {
     const ids = S.savedQuiz;
     area.innerHTML = ids.length ? ids.map((id) => {
@@ -1203,6 +1271,463 @@ function bindSavedJump(area) {
 }
 
 /* ========================================================
+   過去問（司法試験 短答式）
+
+   問題と正答は法務省の公表PDFから tools/build_exams.py で起こしたもの。
+   解答欄（No.）がひとつの答える単位で、ひとつの問に1個または複数ある。
+   採点は実際の配点どおりに行い、部分点のある問はその規則にも従う。
+   ======================================================== */
+const EXKINDS = {
+  each: '記述ごとに正誤',
+  combo: '組合せ',
+  blank: '空欄の組合せ',
+  multi: '複数選択（順不同）',
+};
+
+let exYear = null;      // 絞り込み（null はすべて）
+let exLaw = null;
+let exSet = null;       // いま解いているセットのデータ
+let exQs = [];          // 出題する問の配列
+let exI = 0;
+let exPicks = {};       // 問番号 -> 選んだ値の配列
+let exGraded = false;   // いまの問を採点したか
+
+function exId(setKey, q) { return setKey + ':' + q; }
+
+/* 配点どおりに採点する。戻り値は {ok, pt, right, picked} */
+function exGrade(q, picks) {
+  const full = q.pt;
+  const want = q.slots.map((s) => s.ans);
+  if (q.anyOk) return { ok: true, pt: full, any: true };
+  const got = picks || [];
+  if (q.kind === 'multi') {
+    // 順不同。選んだ集合が正解の集合と一致すれば満点、そうでなければ0点
+    const a = got.slice().sort().join(',');
+    const b = want.slice().sort().join(',');
+    const ok = a === b && got.length === want.length;
+    return { ok, pt: ok ? full : 0 };
+  }
+  if (q.kind === 'each') {
+    let n = 0;
+    want.forEach((w, i) => { if (got[i] === w) n += 1; });
+    if (n === want.length) return { ok: true, pt: full, n };
+    if (q.partial && n === q.partial.need) return { ok: false, pt: q.partial.pt, n, part: true };
+    return { ok: false, pt: 0, n };
+  }
+  const ok = got[0] === want[0];
+  return { ok, pt: ok ? full : 0 };
+}
+
+/* 「正しい場合には１を、誤っている場合には２を」から選択肢の名前を取る */
+function exEachLabels(lead) {
+  const m = lead.match(/([^、，。]{2,30}?)場合には[１1]を[、，]([^、，。]{2,30}?)場合には[２2]を/);
+  if (!m) return ['１', '２'];
+  const trim = (s) => (s.length > 14 ? s.slice(0, 13) + '…' : s);
+  return [trim(m[1]), trim(m[2])];
+}
+
+/* 論点の語が「」で始まっていたら、かぎかっこを重ねない */
+function exQuote(s) {
+  return /^[「『]/.test(s) ? s : '「' + s + '」';
+}
+
+/* ヘッダーの得点表示を書き直す。
+   まちがえた問だけを解き直しているときは、その回の満点で示す。 */
+function exRefreshScore() {
+  const t = exTotals();
+  $('#ex-score').textContent = `${t.pt}点 / ${t.full}点`;
+}
+
+function exDone(setKey, q) {
+  const st = S.exstat[exId(setKey, q)];
+  return st ? st.o : 0;
+}
+
+/* ---------- 一覧 ---------- */
+function renderExamChips() {
+  const years = [];
+  EXSETS.forEach((s) => { if (!years.some((y) => y.year === s.year)) years.push(s); });
+  $('#ex-year-chips').innerHTML = [`<button class="chip${exYear ? '' : ' active'}" data-y="">すべての年度</button>`]
+    .concat(years.map((s) => `<button class="chip${exYear === s.year ? ' active' : ''}" data-y="${s.year}">${esc(s.yearLabel)}</button>`))
+    .join('');
+  $$('#ex-year-chips .chip').forEach((b) => b.addEventListener('click', () => {
+    exYear = b.dataset.y || null;
+    renderExamGrid();
+  }));
+  const laws = (EXINDEX.subjects || []).map((x) => x.law);
+  $('#ex-law-chips').innerHTML = [`<button class="chip${exLaw ? '' : ' active'}" data-l="">3科目</button>`]
+    .concat(laws.map((k) => `<button class="chip${exLaw === k ? ' active' : ''}" data-l="${k}">${esc(META[k] ? META[k].short : k)}</button>`))
+    .join('');
+  $$('#ex-law-chips .chip').forEach((b) => b.addEventListener('click', () => {
+    exLaw = b.dataset.l || null;
+    renderExamGrid();
+  }));
+}
+
+function renderExamGrid() {
+  renderExamChips();
+  const list = EXSETS.filter((s) => (!exYear || s.year === exYear) && (!exLaw || s.law === exLaw));
+  $('#ex-grid').innerHTML = list.map((s) => {
+    const m = META[s.law] || {};
+    const best = S.exbest[s.key];
+    const prog = S.exprog[s.key];
+    const done = prog ? Object.keys(prog.picks || {}).length : 0;
+    return `<button class="law-card" data-key="${s.key}" style="--ec:${m.color || ''}">
+      <div class="lc-top"><span class="lc-icon">${m.icon || '🏛'}</span>
+        <div><div class="lc-name">${esc(s.yearLabel)} ${esc(s.subject)}</div>
+        <div class="lc-kana">満点${s.full}点 ／ 基準点${s.pass}点</div></div></div>
+      <div class="lc-blurb">${s.count}問・解答欄${s.slots}</div>
+      <div class="lc-meta">
+        ${best ? `<span class="ex-best${best.pt >= s.pass ? ' pass' : ''}">自己最高 ${best.pt}点（${pct(best.pt, best.full)}%）</span>`
+    : '<span>未受験</span>'}
+        ${done && done < s.count ? `<span class="ex-prog">${done}問まで解答ずみ</span>` : ''}
+      </div>
+    </button>`;
+  }).join('') || '<div class="empty">該当する過去問がありません。</div>';
+  $$('#ex-grid .law-card').forEach((b) => b.addEventListener('click', () => openExam(b.dataset.key)));
+  $('#ex-source').innerHTML = EXSETS.length
+    ? `問題と正答は ${esc(EXINDEX.source)} より取得（${esc(EXINDEX.built)} 時点）。`
+      + `${esc(EXINDEX.license)}に基づいて利用しています。編集・加工した部分（問題文の文字起こしと画面表示）はこのアプリによるもので、法務省が作成したものではありません。`
+      + '収録は民法改正の施行後にあたる令和2年以降の3科目です。'
+    : '';
+}
+
+/* ---------- セットを開く ---------- */
+function openExam(key) {
+  const meta = EXSET[key];
+  if (!meta) return;
+  $('#ex-grid').innerHTML = '<div class="loading">過去問を読み込んでいます…</div>';
+  loadExam(key).then((data) => {
+    exSet = data;
+    const prog = S.exprog[key];
+    const answered = prog && prog.picks ? Object.keys(prog.picks).length : 0;
+    if (answered && answered < data.count
+      && confirm(`${data.yearLabel}${data.subject}は${answered}問まで解答ずみです。続きから始めますか？\n「キャンセル」で最初からやり直します。`)) {
+      exPicks = Object.assign({}, prog.picks);
+    } else {
+      exPicks = {};
+    }
+    startExam(data.questions.slice());
+  }).catch(() => {
+    renderExamGrid();
+    toast('過去問を読み込めませんでした');
+  });
+}
+
+/* 特定の問だけを開く（保存一覧から飛んでくるとき） */
+function openExamAt(key, qn) {
+  loadExam(key).then((data) => {
+    exSet = data;
+    const q = data.questions.find((x) => x.q === qn);
+    if (!q) { toast('その問が見つかりませんでした'); return; }
+    exPicks = {};
+    startExam([q]);
+  }).catch(() => toast('過去問を読み込めませんでした'));
+}
+
+function startExam(questions) {
+  exQs = questions;
+  // 解答ずみを飛ばして、最初の未解答から始める
+  exI = exQs.findIndex((q) => !exPicks[q.q]);
+  if (exI < 0) exI = 0;
+  $('#exam-list-view').classList.add('hidden');
+  $('#exam-result').classList.add('hidden');
+  $('#exam-play').classList.remove('hidden');
+  showExQuestion();
+  window.scrollTo({ top: 0 });
+}
+
+function exTotals() {
+  let pt = 0; let full = 0; let n = 0; let c = 0;
+  exQs.forEach((q) => {
+    full += q.pt;
+    if (!exPicks[q.q]) return;
+    const g = exGrade(q, exPicks[q.q]);
+    pt += g.pt; n += 1;
+    if (g.ok) c += 1;
+  });
+  return { pt, full, n, c };
+}
+
+function showExQuestion() {
+  exGraded = false;
+  const q = exQs[exI];
+  const t = exTotals();
+  $('#ex-progress').textContent = (exI + 1) + ' / ' + exQs.length;
+  $('#ex-score').textContent = `${t.pt}点 / ${t.full}点`;
+  $('#ex-bar').style.width = (exI / exQs.length * 100) + '%';
+  $('#btn-ex-next').classList.add('hidden');
+  $('#btn-ex-skip').classList.remove('hidden');
+  exSetSaveLabel(S.savedExam.includes(exId(exSet.key, q.q)));
+
+  const m = META[exSet.law] || {};
+  const blocks = (q.blocks || []).map((b) => `
+    <div class="ex-block"><div class="ex-block-h">【${esc(b.t)}】</div>
+      <div class="ex-block-s">${esc(b.s)}</div></div>`).join('');
+  const words = (q.words || []).length ? `
+    <div class="ex-block"><div class="ex-block-h">【語句群】</div>
+      <ul class="ex-words">${q.words.map((w) => `<li><b>${esc(w.m)}</b> ${esc(w.s)}</li>`).join('')}</ul></div>` : '';
+
+  let answerArea = '';
+  if (q.kind === 'each') {
+    const lab = exEachLabels(q.lead);
+    answerArea = `<div class="ex-stmts">${q.stmts.map((s, i) => `
+      <div class="ex-stmt" data-i="${i}">
+        <div class="ex-stmt-s"><b>${esc(s.m)}</b>　${esc(s.s)}</div>
+        <div class="ex-pick">
+          <button class="choice sm" data-i="${i}" data-v="1"><span class="num">1</span><span>${esc(lab[0])}</span></button>
+          <button class="choice sm" data-i="${i}" data-v="2"><span class="num">2</span><span>${esc(lab[1])}</span></button>
+        </div>
+      </div>`).join('')}</div>`;
+  } else {
+    const stmts = (q.stmts || []).length ? `<div class="ex-stmts read">${q.stmts.map((s) => `
+      <div class="ex-stmt-s"><b>${esc(s.m)}</b>　${esc(s.s)}</div>`).join('')}</div>` : '';
+    const need = q.slots.length;
+    answerArea = stmts + `
+      ${need > 1 ? `<p class="muted small">${need}つ選んでください（順番は問いません）。</p>` : ''}
+      <div class="choices">${(q.opts || []).map((o) => `
+        <button class="choice" data-v="${o.n}"><span class="num">${o.n}</span><span>${esc(o.s)}</span></button>`).join('')}</div>`;
+  }
+
+  $('#ex-area').innerHTML = `
+    <div class="q-meta">
+      <span class="q-tag era" style="--ec:${m.color || ''}">${esc(exSet.yearLabel)} ${esc(exSet.subject)}</span>
+      <span class="q-tag">第${q.q}問</span>
+      <span class="q-tag">配点 ${q.pt}</span>
+      <span class="q-tag">${esc(EXKINDS[q.kind] || q.kind)}</span>
+      ${exDone(exSet.key, q.q) ? `<span class="q-tag muted">${exDone(exSet.key, q.q)}回目</span>` : ''}
+    </div>
+    <div class="ex-lead">${esc(q.lead)}</div>
+    ${blocks}${words}
+    ${answerArea}
+    ${q.refText ? `<div class="ex-ref">（参照条文）${esc(q.refText)}</div>` : ''}
+    <div id="ex-after"></div>`;
+
+  // 選んだものを覚えておく（複数選択に対応するため配列で持つ）
+  let picked = (exPicks[q.q] || []).slice();
+  const paint = () => {
+    if (q.kind === 'each') {
+      $$('#ex-area .choice').forEach((b) => {
+        b.classList.toggle('picked', picked[+b.dataset.i] === +b.dataset.v);
+      });
+    } else {
+      $$('#ex-area .choice').forEach((b) => {
+        b.classList.toggle('picked', picked.includes(+b.dataset.v));
+      });
+    }
+    const filled = q.kind === 'each'
+      ? picked.filter((x) => x).length === q.stmts.length
+      : picked.length === q.slots.length;
+    $('#btn-ex-next').classList.toggle('hidden', !filled && !exGraded);
+    $('#btn-ex-next').textContent = exI + 1 >= exQs.length ? '採点する →' : '次の問題 →';
+  };
+  $$('#ex-area .choice').forEach((b) => b.addEventListener('click', () => {
+    if (exGraded) return;
+    const v = +b.dataset.v;
+    if (q.kind === 'each') {
+      picked[+b.dataset.i] = v;
+    } else if (q.slots.length > 1) {
+      const i = picked.indexOf(v);
+      if (i >= 0) picked.splice(i, 1);
+      else if (picked.length < q.slots.length) picked.push(v);
+      else { picked.shift(); picked.push(v); }
+    } else {
+      picked = [v];
+    }
+    paint();
+  }));
+  if (picked.length) paint();
+  else {
+    $('#btn-ex-next').classList.add('hidden');
+    $('#btn-ex-next').textContent = exI + 1 >= exQs.length ? '採点する →' : '次の問題 →';
+  }
+  exQs[exI]._pick = () => picked;
+}
+
+/* 解答を確定して、その場で採点する設定なら答えを出す */
+function exCommit() {
+  const q = exQs[exI];
+  if (!q) return false;
+  const picked = q._pick ? q._pick() : [];
+  if (!picked.length) return false;
+  const first = !exPicks[q.q];
+  exPicks[q.q] = picked;
+  const g = exGrade(q, picked);
+  if (first) {
+    const id = exId(exSet.key, q.q);
+    const st = S.exstat[id] || { o: 0, x: 0 };
+    st.o += 1;
+    if (!g.ok) st.x += 1;
+    S.exstat[id] = st;
+    const ls = S.lawstat[exSet.law] || { o: 0, c: 0 };
+    ls.o += 1; if (g.ok) ls.c += 1;
+    S.lawstat[exSet.law] = ls;
+    S.days[today()] = (S.days[today()] || 0) + 1;
+  }
+  S.exprog[exSet.key] = { picks: exPicks };
+  save();
+  exRefreshScore();
+  return true;
+}
+
+function exShowAnswer() {
+  const q = exQs[exI];
+  const g = exGrade(q, exPicks[q.q]);
+  const want = q.slots.map((s) => s.ans);
+  exGraded = true;
+  $('#btn-ex-skip').classList.add('hidden');
+  if (q.kind === 'each') {
+    $$('#ex-area .choice').forEach((b) => {
+      const i = +b.dataset.i; const v = +b.dataset.v;
+      b.disabled = true;
+      if (want[i] === v) b.classList.add('correct');
+      else if (exPicks[q.q][i] === v) b.classList.add('wrong');
+    });
+  } else {
+    $$('#ex-area .choice').forEach((b) => {
+      const v = +b.dataset.v;
+      b.disabled = true;
+      if (want.includes(v)) b.classList.add('correct');
+      else if (exPicks[q.q].includes(v)) b.classList.add('wrong');
+    });
+  }
+  const label = q.kind === 'each'
+    ? q.slots.map((s, i) => `${q.stmts[i] ? q.stmts[i].m : 'No.' + s.no}=${s.ans}`).join('　')
+    : want.join('・');
+  $('#ex-after').innerHTML = `
+    <div class="verdict ${g.ok ? 'ok' : g.pt ? 'part' : 'ng'}">
+      ${g.any ? '◯ 全員正答として扱われた問題です' : g.ok ? '◯ 正解' : g.part ? '△ 部分点' : '✕ まちがい'}
+      <span class="v-pt">${g.pt} / ${q.pt}点</span>
+    </div>
+    <div class="exp">
+      <div class="exp-h">正解　${esc(label)}</div>
+      ${g.n != null ? `<div class="muted small">${g.n} / ${q.slots.length}問 正解</div>` : ''}
+      ${q.note ? `<div class="muted small">配点の扱い：${esc(q.note)}</div>` : ''}
+      ${q.anyOk ? '<div class="study-note">この問は出題の不備により、受験者全員が正答として取り扱われました。</div>' : ''}
+      <div class="row wrap" style="margin-top:10px">
+        ${(q.refs || []).slice(0, 6).map((r) => {
+    const [lk, nm] = r.split(':');
+    return `<button class="btn ghost sm ex-goart" data-law="${lk}" data-num="${esc(nm)}">📚 ${esc(META[lk] ? META[lk].short : lk)}${esc(nm.replace(/_/g, 'の'))}条</button>`;
+  }).join('')}
+        ${q.topic ? `<button class="btn ghost sm" id="btn-ex-search">🔍 ${esc(exQuote(q.topic))}で条文を検索</button>` : ''}
+      </div>
+    </div>`;
+  $$('#ex-after .ex-goart').forEach((b) => b.addEventListener('click', () => {
+    goTab('laws');
+    openLaw(b.dataset.law, { num: b.dataset.num });
+  }));
+  const sb = $('#btn-ex-search');
+  if (sb) sb.addEventListener('click', () => {
+    goTab('search');
+    $('#sx-input').value = q.topic;
+    runSearch();
+  });
+  $('#btn-ex-next').classList.remove('hidden');
+}
+
+/* 終わったあとにもう一度押されても落ちないよう、出題中かどうかを先に見る */
+function exPlaying() {
+  return !$('#exam-play').classList.contains('hidden') && exI < exQs.length;
+}
+$('#btn-ex-next').addEventListener('click', () => {
+  if (!exPlaying()) return;
+  if (!exGraded) {
+    if (!exCommit()) { toast('選んでから進んでください'); return; }
+    if (S.set.exmark) { exShowAnswer(); return; }
+  }
+  exI += 1;
+  if (exI >= exQs.length) finishExam();
+  else { showExQuestion(); window.scrollTo({ top: 0 }); }
+});
+$('#btn-ex-skip').addEventListener('click', () => {
+  if (!exPlaying()) return;
+  exI += 1;
+  if (exI >= exQs.length) finishExam();
+  else { showExQuestion(); window.scrollTo({ top: 0 }); }
+});
+function exSetSaveLabel(on) {
+  $('#btn-ex-save').textContent = on ? '⭐ 保存ずみ（はずす）' : '⭐ この問題を保存';
+}
+$('#btn-ex-save').addEventListener('click', () => {
+  if (!exSet || !exQs[exI]) return;
+  const id = exId(exSet.key, exQs[exI].q);
+  const i = S.savedExam.indexOf(id);
+  if (i >= 0) { S.savedExam.splice(i, 1); toast('保存をはずしました'); }
+  else { S.savedExam.push(id); toast('⭐ 保存しました'); }
+  save();
+  exSetSaveLabel(i < 0);
+});
+$('#btn-ex-back').addEventListener('click', () => {
+  $('#exam-play').classList.add('hidden');
+  $('#exam-result').classList.add('hidden');
+  $('#exam-list-view').classList.remove('hidden');
+  renderExamGrid();
+});
+
+function finishExam() {
+  const t = exTotals();
+  const answered = exQs.filter((q) => exPicks[q.q]);
+  const whole = answered.length === exSet.count;   // 全問解いたときだけ記録に残す
+  if (whole) {
+    const best = S.exbest[exSet.key];
+    if (!best || t.pt > best.pt) {
+      S.exbest[exSet.key] = { pt: t.pt, full: exSet.full, n: t.n, c: t.c, d: today() };
+    }
+    S.sessions.push({ d: today(), n: t.n, c: t.c });
+    if (S.sessions.length > 200) S.sessions = S.sessions.slice(-200);
+    delete S.exprog[exSet.key];
+    save();
+  }
+  const full = whole ? exSet.full : t.full;
+  const pass = t.pt >= exSet.pass;
+  $('#exam-play').classList.add('hidden');
+  $('#exam-result').classList.remove('hidden');
+  $('#exam-result').innerHTML = `
+    <div class="card"><div class="result-score">
+      <div class="rs-num">${t.pt} / ${full}点</div>
+      <div class="rs-sub">${t.c} / ${t.n}問 正解（正答率 ${pct(t.c, t.n)}%）</div>
+      ${whole ? `<div class="rs-msg ${pass ? 'pass' : 'fail'}">
+        ${esc(exSet.subject)}の基準点は${exSet.pass}点（満点の40%）です。${pass ? 'この科目の基準は超えています。' : 'あと' + (exSet.pass - t.pt) + '点です。'}</div>`
+    : `<div class="muted small">${exQs.length}問だけを解いた回です（${esc(exSet.yearLabel)}${esc(exSet.subject)}は全${exSet.count}問・満点${exSet.full}点）。
+         通しで解いていないので、自己最高には記録していません。</div>`}
+    </div></div>
+    <div class="card"><strong>問ごとの結果</strong>
+      <div class="ex-marks">${exQs.map((q, i) => {
+    if (!exPicks[q.q]) return `<button class="ex-mark skip" data-i="${i}">${q.q}</button>`;
+    const g = exGrade(q, exPicks[q.q]);
+    return `<button class="ex-mark ${g.ok ? 'ok' : g.pt ? 'part' : 'ng'}" data-i="${i}">${q.q}</button>`;
+  }).join('')}</div>
+      <p class="muted small">番号を押すとその問をもう一度見られます。</p></div>
+    <div class="row wrap">
+      <button class="btn ghost" id="btn-ex-wrong">↻ まちがえた問だけ</button>
+      <span class="spacer"></span>
+      <button class="btn ghost" id="btn-ex-retry">↻ 最初から</button>
+      <button class="btn primary" id="btn-ex-done">一覧へ戻る</button></div>`;
+  $$('#exam-result .ex-mark').forEach((b) => b.addEventListener('click', () => {
+    exI = +b.dataset.i;
+    $('#exam-result').classList.add('hidden');
+    $('#exam-play').classList.remove('hidden');
+    showExQuestion();
+    if (exPicks[exQs[exI].q]) exShowAnswer();
+    window.scrollTo({ top: 0 });
+  }));
+  $('#btn-ex-wrong').addEventListener('click', () => {
+    const wrong = exQs.filter((q) => exPicks[q.q] && !exGrade(q, exPicks[q.q]).ok);
+    if (!wrong.length) { toast('まちがえた問はありません'); return; }
+    wrong.forEach((q) => { delete exPicks[q.q]; });
+    startExam(wrong);
+  });
+  $('#btn-ex-retry').addEventListener('click', () => {
+    exPicks = {};
+    delete S.exprog[exSet.key];
+    save();
+    startExam(exSet.questions.slice());
+  });
+  $('#btn-ex-done').addEventListener('click', () => $('#btn-ex-back').click());
+  window.scrollTo({ top: 0 });
+}
+
+/* ========================================================
    設定
    ======================================================== */
 $('#btn-settings').addEventListener('click', () => $('#settings-dialog').showModal());
@@ -1218,6 +1743,7 @@ $('#set-cap').addEventListener('change', (e) => {
   save();
   if (curSec >= 0 && !$('#law-arts-view').classList.contains('hidden')) openSection(curSec);
 });
+$('#set-exmark').addEventListener('change', (e) => { S.set.exmark = e.target.checked; save(); });
 $('#set-fontsize').addEventListener('change', (e) => { S.set.fontsize = +e.target.value; save(); applySet(); });
 $('#set-theme').addEventListener('change', (e) => { S.set.theme = e.target.value; save(); applySet(); });
 
@@ -1226,6 +1752,7 @@ $('#set-theme').addEventListener('change', (e) => { S.set.theme = e.target.value
    ======================================================== */
 $('#set-shuffle').checked = S.set.shuffle;
 $('#set-cap').checked = S.set.cap;
+$('#set-exmark').checked = S.set.exmark;
 $('#set-fontsize').value = String(S.set.fontsize);
 $('#set-theme').value = S.set.theme;
 $('#set-about').textContent =
@@ -1245,6 +1772,7 @@ renderTerms();
 renderQLawChips();
 renderQTypeChips();
 updatePool();
+renderExamGrid();
 
 /* ========== オフライン保存 ========== */
 $('#set-offline').addEventListener('click', async () => {
@@ -1254,7 +1782,8 @@ $('#set-offline').addEventListener('click', async () => {
     note.textContent = 'この環境ではオフライン保存が使えません。https:// で開いているか確かめてください。';
     return;
   }
-  const files = METAS.map((m) => 'laws/' + m.key + '.js?v=4');
+  const files = METAS.map((m) => 'laws/' + m.key + '.js?v=5')
+    .concat(EXSETS.map((s) => 'exams/' + s.key + '.js?v=5'));
   btn.disabled = true;
   let done = 0;
   try {
@@ -1264,7 +1793,8 @@ $('#set-offline').addEventListener('click', async () => {
       done += 1;
       note.textContent = `保存中… ${done} / ${files.length}`;
     }
-    note.textContent = `${files.length}件の法令を保存しました。電波がなくても全部読めます。`;
+    note.textContent = `法令${METAS.length}件と過去問${EXSETS.length}セットを保存しました。`
+      + '電波がなくても全部読めます。';
     toast('⬇ オフライン保存が終わりました');
   } catch (e) {
     note.textContent = `途中で止まりました（${done} / ${files.length}）。通信を確かめてもう一度お試しください。`;

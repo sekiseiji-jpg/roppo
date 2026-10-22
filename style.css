@@ -290,8 +290,11 @@ dialog::backdrop { background: rgba(12,15,28,.55); }
 
 @media (max-width: 480px) {
   .tab .tl { display: none; }
-  .tab { padding: 7px 14px; }
-  .tab.active .tl { display: inline; }
+  /* タブは8つある。狭い画面でも全部が一度に見えるように詰める */
+  .tabs { gap: 2px; padding: 8px 6px; }
+  .tab { padding: 7px 7px; gap: 3px; }
+  .tab.active { padding: 7px 10px; }
+  .tab.active .tl { display: inline; font-size: .86rem; }
   main { padding: 14px 13px 60px; }
   .era-grid { grid-template-columns: 1fr; }
   .bar-row { grid-template-columns: 6em 1fr 3.2em; }
@@ -441,3 +444,64 @@ dialog::backdrop { background: rgba(12,15,28,.55); }
 }
 .update-bar span { flex: 1; min-width: 0; }
 .update-bar .btn { flex: 0 0 auto; padding: 6px 14px; white-space: nowrap; }
+
+/* ========== 過去問 ========== */
+.ex-lead {
+  font-size: .97rem; line-height: 1.85; margin: 12px 0 14px;
+  padding-left: 11px; border-left: 3px solid var(--primary);
+}
+.ex-block {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 11px 13px; margin: 0 0 12px;
+}
+.ex-block-h { font-weight: 700; color: var(--accent); font-size: .82rem; letter-spacing: .06em; }
+.ex-block-s { white-space: pre-wrap; font-size: .93rem; line-height: 1.85; margin-top: 6px; }
+.ex-words { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 3px; font-size: .9rem; }
+.ex-words b { color: var(--primary); margin-right: 4px; }
+
+.ex-stmts { display: grid; gap: 12px; margin-bottom: 14px; }
+.ex-stmts.read { gap: 9px; }
+.ex-stmt-s { font-size: .94rem; line-height: 1.85; }
+.ex-stmt-s b { color: var(--primary); }
+.ex-stmt {
+  border: 1px solid var(--border); border-radius: 10px; padding: 11px 12px;
+  background: var(--surface);
+}
+.ex-pick { display: flex; gap: 8px; margin-top: 9px; flex-wrap: wrap; }
+.ex-pick .choice { flex: 1 1 9em; }
+.choice.sm { padding: 8px 10px; font-size: .88rem; }
+.choice.picked { border-color: var(--primary); background: var(--primary-soft); }
+.choice.picked .num { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
+.btn.sm { padding: 5px 10px; font-size: .82rem; }
+
+.verdict.part { color: var(--accent); }
+.verdict .v-pt { font-weight: 700; font-size: .85rem; color: var(--muted); margin-left: 8px; }
+.ex-ref {
+  font-size: .85rem; color: var(--muted); margin-top: 12px;
+  padding: 9px 11px; border: 1px dashed var(--border); border-radius: 8px;
+  white-space: pre-wrap; line-height: 1.8;
+}
+
+.ex-marks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ex-mark {
+  width: 2.2em; height: 2.2em; border-radius: 8px; font-size: .84rem; font-weight: 700;
+  border: 1px solid var(--border); background: var(--surface2); color: var(--muted); cursor: pointer;
+}
+.ex-mark.ok { background: var(--good-soft); border-color: var(--good); color: var(--good); }
+.ex-mark.part { background: var(--primary-soft); border-color: var(--accent); color: var(--accent); }
+.ex-mark.ng { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
+.ex-mark.skip { opacity: .6; }
+
+.lc-meta .ex-best { color: var(--accent); font-weight: 700; }
+.lc-meta .ex-best.pass { color: var(--good); }
+.lc-meta .ex-prog { color: var(--primary); }
+.bar-track > div.under { background: var(--bad); }
+.rs-msg.pass { color: var(--good); font-weight: 700; }
+.rs-msg.fail { color: var(--bad); }
+#stat-exam .bar-row[data-key] { cursor: pointer; }
+#exam-result .row.wrap { gap: 8px; }
+@media (max-width: 480px) {
+  #exam-result .row.wrap { display: grid; grid-template-columns: 1fr 1fr; }
+  #exam-result .row.wrap .spacer { display: none; }
+  #exam-result .row.wrap .btn.primary { grid-column: 1 / -1; }
+}

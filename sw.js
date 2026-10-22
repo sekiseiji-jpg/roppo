@@ -1,9 +1,9 @@
 // オフライン対応: アプリのファイルはネット優先で取得し、つながらないときはキャッシュを使う
 // ファイルを更新したら CACHE の番号と、index.html の ?v= の番号を一緒に上げる
 //
-// laws/*.js は合わせて3.6MBあるので、最初から全部キャッシュはしない。
-// 一度開いた法令だけが下の fetch ハンドラでキャッシュに入っていく。
-const CACHE = 'roppo-v4';
+// laws/*.js は合わせて4.1MB、exams/*.js は0.9MBあるので、最初から全部キャッシュはしない。
+// 一度開いた法令・過去問だけが下の fetch ハンドラでキャッシュに入っていく。
+const CACHE = 'roppo-v5';
 const FILES = [
   './',
   'index.html',
@@ -11,6 +11,7 @@ const FILES = [
   'app.js',
   'data-study.js',
   'laws/index.js',
+  'exams/index.js',
   'manifest.webmanifest',
   'icon-192.png',
   'icon-512.png',
