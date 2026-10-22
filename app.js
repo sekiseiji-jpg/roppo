@@ -90,7 +90,7 @@ function loadLaw(key) {
   if (pending[key]) return pending[key];
   pending[key] = new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = 'laws/' + key + '.js?v=5';
+    s.src = 'laws/' + key + '.js?v=6';
     s.onload = () => (window.LAWDATA[key] ? resolve(window.LAWDATA[key]) : reject(new Error(key)));
     s.onerror = () => reject(new Error(key));
     document.head.appendChild(s);
@@ -115,7 +115,7 @@ function loadExam(key) {
   if (exPending[key]) return exPending[key];
   exPending[key] = new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = 'exams/' + key + '.js?v=5';
+    s.src = 'exams/' + key + '.js?v=6';
     s.onload = () => (window.EXAMDATA[key] ? resolve(window.EXAMDATA[key]) : reject(new Error(key)));
     s.onerror = () => reject(new Error(key));
     document.head.appendChild(s);
@@ -1782,8 +1782,8 @@ $('#set-offline').addEventListener('click', async () => {
     note.textContent = 'この環境ではオフライン保存が使えません。https:// で開いているか確かめてください。';
     return;
   }
-  const files = METAS.map((m) => 'laws/' + m.key + '.js?v=5')
-    .concat(EXSETS.map((s) => 'exams/' + s.key + '.js?v=5'));
+  const files = METAS.map((m) => 'laws/' + m.key + '.js?v=6')
+    .concat(EXSETS.map((s) => 'exams/' + s.key + '.js?v=6'));
   btn.disabled = true;
   let done = 0;
   try {

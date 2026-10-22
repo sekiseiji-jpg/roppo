@@ -3,7 +3,7 @@
 //
 // laws/*.js は合わせて4.1MB、exams/*.js は0.9MBあるので、最初から全部キャッシュはしない。
 // 一度開いた法令・過去問だけが下の fetch ハンドラでキャッシュに入っていく。
-const CACHE = 'roppo-v5';
+const CACHE = 'roppo-v6';
 const FILES = [
   './',
   'index.html',

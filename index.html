@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#35497e">
-  <meta name="description" content="憲法・民法・刑法・商法・会社法・民事訴訟法・刑事訴訟法の条文を読んで検索でき、重要条文をクイズで覚えられるアプリ">
+  <meta name="description" content="憲法・民法・刑法・商法・会社法・民事訴訟法・刑事訴訟法・行政法の条文を読んで検索でき、重要条文をクイズで覚え、司法試験の短答式過去問を解けるアプリ">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <header class="app-header">
@@ -40,7 +40,7 @@
     <section id="tab-laws" class="panel active">
       <!-- 法令一覧 -->
       <div id="law-list-view">
-        <p class="lead">読みたい法律を選んでください。条文は e-Gov 法令API（デジタル庁）の公式データです。</p>
+        <p class="lead">読みたい法律を選んでください。条文は e-Gov 法令API（デジタル庁）の公式データです。行政法は、行政手続法など5つの法律に分かれています。</p>
         <div id="law-grid" class="law-grid"></div>
         <p class="muted small" id="law-source"></p>
       </div>
@@ -325,9 +325,9 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="laws/index.js?v=5"></script>
-  <script src="exams/index.js?v=5"></script>
-  <script src="data-study.js?v=5"></script>
-  <script src="app.js?v=5"></script>
+  <script src="laws/index.js?v=6"></script>
+  <script src="exams/index.js?v=6"></script>
+  <script src="data-study.js?v=6"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>
