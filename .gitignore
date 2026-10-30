@@ -6,3 +6,5 @@ __pycache__/
 
 # e-Gov APIの生データ。tools/build_laws.py で取り直せるので公開しない（7.5MB）
 raw/
+# 裁判所サイトの詳細ページ。tools/build_cases.py で取り直せるので公開しない
+raw_cases/

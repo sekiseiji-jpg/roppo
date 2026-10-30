@@ -3,7 +3,7 @@
 //
 // laws/*.js は合わせて4.1MB、exams/*.js は0.9MBあるので、最初から全部キャッシュはしない。
 // 一度開いた法令・過去問だけが下の fetch ハンドラでキャッシュに入っていく。
-const CACHE = 'roppo-v6';
+const CACHE = 'roppo-v7';
 const FILES = [
   './',
   'index.html',
@@ -12,6 +12,7 @@ const FILES = [
   'data-study.js',
   'laws/index.js',
   'exams/index.js',
+  'cases/index.js',
   'manifest.webmanifest',
   'icon-192.png',
   'icon-512.png',
@@ -35,7 +36,11 @@ self.addEventListener('message', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      // 消すのは自分の古い版だけにする。キャッシュはドメイン全体で共有なので、
+      // 名前で絞らないと同じドメインに置いた別のアプリまで消してしまう
+      .then((keys) => Promise.all(keys
+        .filter((k) => k.startsWith('roppo') && k !== CACHE)
+        .map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });

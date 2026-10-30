@@ -30,6 +30,8 @@ const defaults = {
   exbest: {},      // setKey -> {pt, full, n, c, d}（自己最高）
   exprog: {},      // setKey -> {picks: {問番号: [選んだ値]}}（中断したところ）
   savedExam: [],   // "setKey:問番号"
+  readCase: {},    // 判例の分野id -> true（開いた）
+  savedCases: [],  // 判例のkey
   set: { shuffle: true, cap: true, fontsize: 16, theme: 'auto', exmark: true },
 };
 let S = load();
@@ -90,7 +92,7 @@ function loadLaw(key) {
   if (pending[key]) return pending[key];
   pending[key] = new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = 'laws/' + key + '.js?v=6';
+    s.src = 'laws/' + key + '.js?v=7';
     s.onload = () => (window.LAWDATA[key] ? resolve(window.LAWDATA[key]) : reject(new Error(key)));
     s.onerror = () => reject(new Error(key));
     document.head.appendChild(s);
@@ -115,7 +117,7 @@ function loadExam(key) {
   if (exPending[key]) return exPending[key];
   exPending[key] = new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = 'exams/' + key + '.js?v=6';
+    s.src = 'exams/' + key + '.js?v=7';
     s.onload = () => (window.EXAMDATA[key] ? resolve(window.EXAMDATA[key]) : reject(new Error(key)));
     s.onerror = () => reject(new Error(key));
     document.head.appendChild(s);
@@ -129,6 +131,7 @@ $$('.tab').forEach((t) => t.addEventListener('click', () => {
   $$('.tab').forEach((x) => x.classList.toggle('active', x === t));
   const name = t.dataset.tab;
   $$('.panel').forEach((p) => p.classList.toggle('active', p.id === 'tab-' + name));
+  if (name === 'cases') renderCaseGrid();
   if (name === 'stats') renderStats();
   if (name === 'saved') renderSaved();
   if (name === 'quiz') updatePool();
@@ -415,11 +418,13 @@ function artHtml(lawKey, a, opts) {
     ${o.path !== false && a.path && a.path.length ? `<div class="art-path">${esc(a.path.join(' › '))}</div>` : ''}
     ${body}
     ${o.note ? `<div class="study-note">${esc(o.note)}</div>` : ''}
+    ${o.cases === false ? '' : caseLinksFor(lawKey, a.num)}
     ${memo ? `<div class="memo-box">${esc(memo)}</div>` : ''}
   </div>`;
 }
 
 function bindArtTools(root) {
+  bindCaseLinks(root);
   $$('[data-act]', root).forEach((b) => {
     if (b._bound) return;
     b._bound = true;
@@ -754,6 +759,203 @@ $('#btn-study-quiz').addEventListener('click', () => {
   goTab('quiz');
   startQuiz();
 });
+
+/* ========================================================
+   判例
+
+   判決そのもの（事件番号・年月日・判示事項・裁判要旨・参照法条）は
+   裁判所ウェブサイトの公式データで、tools/build_cases.py が取ってくる。
+   事案の概要とひとことだけが手書き。
+   ======================================================== */
+const CASEINDEX = window.CASES_INDEX || { groups: [], byArticle: {}, built: '', source: '' };
+const CGROUPS = CASEINDEX.groups || [];
+const BY_ARTICLE = CASEINDEX.byArticle || {};
+window.CASEDATA = window.CASEDATA || {};
+
+const casePending = {};
+function loadCaseGroup(gid) {
+  if (window.CASEDATA[gid]) return Promise.resolve(window.CASEDATA[gid]);
+  if (casePending[gid]) return casePending[gid];
+  casePending[gid] = new Promise((resolve, reject) => {
+    const el = document.createElement('script');
+    el.src = 'cases/' + gid + '.js?v=7';
+    el.onload = () => (window.CASEDATA[gid] ? resolve(window.CASEDATA[gid]) : reject(new Error(gid)));
+    el.onerror = () => reject(new Error(gid));
+    document.head.appendChild(el);
+  });
+  casePending[gid].catch(() => { delete casePending[gid]; });
+  return casePending[gid];
+}
+
+let caseLaw = '';
+let curCaseGroup = null;
+
+function caseGroupList() {
+  const q = norm(($('#cs-input') || { value: '' }).value.trim());
+  return CGROUPS.filter((g) => (!caseLaw || g.law === caseLaw)
+    && (!q || norm(g.name + g.desc + g.cases.map((c) => c.name).join('')).includes(q)));
+}
+
+function renderCaseChips() {
+  const used = METAS.filter((m) => CGROUPS.some((g) => g.law === m.key));
+  $('#cs-law-chips').innerHTML = '<button class="chip' + (caseLaw ? '' : ' active') + '" data-l="">すべて</button>'
+    + used.map((m) => `<button class="chip${caseLaw === m.key ? ' active' : ''}" data-l="${m.key}">${esc(m.short)}</button>`).join('');
+  $$('#cs-law-chips .chip').forEach((c) => c.addEventListener('click', () => {
+    caseLaw = c.dataset.l === caseLaw ? '' : c.dataset.l;
+    renderCaseChips();
+    renderCaseGrid();
+  }));
+}
+
+function renderCaseGrid() {
+  const list = caseGroupList();
+  const total = CGROUPS.reduce((n, g) => n + g.count, 0);
+  $('#case-grid').innerHTML = list.length ? list.map((g) => {
+    const m = META[g.law] || { color: 'var(--primary)', title: g.law };
+    return `<button class="era-card" style="--ec:${m.color}" data-g="${g.id}">
+      ${S.readCase && S.readCase[g.id] ? '<span class="ec-badge">読了</span>' : ''}
+      <div class="ec-top"><span class="ec-icon">${g.icon}</span>
+        <div><div class="ec-name">${esc(g.name)}</div>
+        <div class="ec-span">${esc(m.title)}・${g.count}件</div></div></div>
+      <div class="ec-catch">${esc(g.desc)}</div>
+    </button>`;
+  }).join('') : '<div class="empty">見つかりませんでした</div>';
+  $$('#case-grid .era-card').forEach((b) => b.addEventListener('click', () => openCaseGroup(b.dataset.g)));
+  $('#case-source').textContent = `出典: ${CASEINDEX.source}（${CASEINDEX.built} 時点）。`
+    + `全${total}件。判示事項・裁判要旨・参照法条は公式データをそのまま収めています。`
+    + '事案の概要とひとことは、このアプリで独自に書いたものです。';
+}
+$('#cs-input').addEventListener('input', renderCaseGrid);
+
+function openCaseGroup(gid, caseKey) {
+  const g = CGROUPS.find((x) => x.id === gid);
+  if (!g) return;
+  curCaseGroup = g;
+  const m = META[g.law] || { color: 'var(--primary)', title: g.law };
+  $('#case-list-view').classList.add('hidden');
+  $('#case-detail-view').classList.remove('hidden');
+  $('#case-hero').style.setProperty('--ec', m.color);
+  $('#case-hero').innerHTML = `
+    <div class="lc-top"><span class="lh-icon">${g.icon}</span>
+      <div><h2>${esc(g.name)}</h2><div class="lh-kana">${esc(m.title)}・${g.count}件</div></div></div>
+    <div class="lh-blurb">${esc(g.desc)}</div>`;
+  $('#case-body').innerHTML = '<div class="loading">判例を読み込んでいます…</div>';
+  S.readCase = S.readCase || {};
+  if (!S.readCase[gid]) { S.readCase[gid] = true; save(); }
+  if (!caseKey) window.scrollTo({ top: 0 });
+  loadCaseGroup(gid).then((list) => {
+    if (curCaseGroup !== g) return;
+    $('#case-body').innerHTML = list.map(caseHtml).join('');
+    bindCaseTools($('#case-body'));
+    if (caseKey) {
+      setTimeout(() => {
+        const el = document.getElementById('case-' + caseKey);
+        if (el) {
+          el.scrollIntoView({ block: 'start' });
+          el.classList.add('hl');
+          setTimeout(() => el.classList.remove('hl'), 2200);
+        }
+      });
+    }
+  }).catch(() => { $('#case-body').innerHTML = '<div class="empty">判例を読み込めませんでした</div>'; });
+}
+$('#btn-case-back').addEventListener('click', () => {
+  $('#case-detail-view').classList.add('hidden');
+  $('#case-list-view').classList.remove('hidden');
+  renderCaseGrid();
+  window.scrollTo({ top: 0 });
+});
+function stepCaseGroup(d) {
+  const list = caseGroupList();
+  const i = list.findIndex((g) => g === curCaseGroup);
+  if (i < 0 || !list.length) return;
+  openCaseGroup(list[(i + d + list.length) % list.length].id);
+}
+$('#btn-case-prev').addEventListener('click', () => stepCaseGroup(-1));
+$('#btn-case-next').addEventListener('click', () => stepCaseGroup(1));
+
+function refPill(r) {
+  if (r.gone) return `<span class="ref-pill gone" title="いまの条文にはありません（削除・改正）">${esc(r.t)}</span>`;
+  if (!r.law) return `<span class="ref-pill plain" title="このアプリに入っていない法令です">${esc(r.t)}</span>`;
+  return `<button class="ref-pill" data-law="${r.law}" data-num="${esc(r.num)}">${esc(r.t)}</button>`;
+}
+
+function caseHtml(c) {
+  const saved = (S.savedCases || []).includes(c.key);
+  const meta = [c.court, c.date, c.type, c.result].filter(Boolean).join('　');
+  return `<div class="case-card" id="case-${esc(c.key)}" data-case="${esc(c.key)}">
+    <div class="case-head">
+      <span class="case-name">${esc(c.name)}</span>
+      <span class="art-tools"><button class="star${saved ? ' on' : ''}" data-cact="star" title="保存">⭐</button></span>
+    </div>
+    <div class="case-meta"><b>${esc(meta)}</b>${c.source ? '　' + esc(c.source) : ''}</div>
+    <div class="case-jiken">${esc(c.jiken)}　${esc(c.title)}</div>
+
+    ${c.facts ? `<div class="case-sec"><div class="cs-h">事案</div><div class="cs-b">${esc(c.facts)}</div></div>` : ''}
+    ${c.issue ? `<div class="case-sec official"><div class="cs-h">判示事項</div><div class="cs-b">${esc(c.issue)}</div></div>` : ''}
+    ${c.held ? `<div class="case-sec official"><div class="cs-h">裁判要旨</div><div class="cs-b">${esc(c.held)}</div></div>` : ''}
+    ${c.refs && c.refs.length ? `<div class="case-sec"><div class="cs-h">参照法条</div>
+      <div class="case-refs">${c.refs.map(refPill).join('')}</div></div>` : ''}
+    ${c.point ? `<div class="case-sec"><div class="case-point">${esc(c.point)}</div></div>` : ''}
+    ${(c.exam || []).length ? `<div class="case-exam"><span>🏛 短答式で問われた条文:</span>
+      ${c.exam.map((r) => examPill(r)).join('')}</div>` : ''}
+    <div class="case-tools">
+      <a class="btn ghost" href="${esc(c.url)}" target="_blank" rel="noopener">📖 裁判所サイトで全文</a>
+    </div>
+  </div>`;
+}
+
+function examPill(ref) {
+  const [law, num] = ref.split(':');
+  const m = META[law];
+  const d = window.LAWDATA[law];
+  const a = d && findArt(d, num);
+  const label = (m ? m.short : law) + ' ' + (a ? a.k : '第' + num.replace(/_/g, 'の') + '条');
+  return `<button class="exam-pill" data-law="${law}" data-num="${esc(num)}">${esc(label)}</button>`;
+}
+
+function bindCaseTools(root) {
+  $$('.ref-pill[data-law], .exam-pill[data-law]', root).forEach((b) => {
+    if (b._bound) return;
+    b._bound = true;
+    b.addEventListener('click', () => {
+      goTab('laws');
+      openLaw(b.dataset.law, { num: b.dataset.num });
+    });
+  });
+  $$('[data-cact="star"]', root).forEach((b) => {
+    if (b._bound) return;
+    b._bound = true;
+    b.addEventListener('click', () => {
+      const key = b.closest('.case-card').dataset.case;
+      S.savedCases = S.savedCases || [];
+      const i = S.savedCases.indexOf(key);
+      if (i >= 0) { S.savedCases.splice(i, 1); toast('保存をはずしました'); }
+      else { S.savedCases.push(key); toast('⭐ 保存しました'); }
+      save();
+      b.classList.toggle('on', i < 0);
+    });
+  });
+}
+
+/* 条文から判例へ。条文カードの下に出すボタンを作る。 */
+function caseLinksFor(lawKey, num) {
+  const list = BY_ARTICLE[lawKey + ':' + num];
+  if (!list || !list.length) return '';
+  return `<div class="art-cases"><span class="ac-h">⚖️ この条文の判例</span>${
+    list.map((c) => `<button class="case-pill" data-cg="${esc(c.g)}" data-ck="${esc(c.k)}">${esc(c.n)}</button>`).join('')}</div>`;
+}
+function bindCaseLinks(root) {
+  $$('.case-pill[data-cg]', root).forEach((b) => {
+    if (b._bound) return;
+    b._bound = true;
+    b.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      goTab('cases');
+      openCaseGroup(b.dataset.cg, b.dataset.ck);
+    });
+  });
+}
 
 /* ========================================================
    用語
@@ -1204,6 +1406,28 @@ $$('.savedtab').forEach((b) => b.addEventListener('click', () => {
 
 function renderSaved() {
   const area = $('#saved-area');
+  if (savedTab === 'case') {
+    const keys = S.savedCases || [];
+    if (!keys.length) {
+      area.innerHTML = '<div class="empty">保存した判例はありません。<br>判例の ⭐ を押すと、ここに集まります。</div>';
+      return;
+    }
+    // どの分野にあるかを一覧から引いて、その分野だけ読み込む
+    const place = {};
+    CGROUPS.forEach((g) => g.cases.forEach((c) => { place[c.key] = g.id; }));
+    const gids = Array.from(new Set(keys.map((k) => place[k]).filter(Boolean)));
+    area.innerHTML = '<div class="loading">判例を読み込んでいます…</div>';
+    Promise.all(gids.map(loadCaseGroup)).then(() => {
+      const html = keys.map((k) => {
+        const list = window.CASEDATA[place[k]] || [];
+        const c = list.find((x) => x.key === k);
+        return c ? caseHtml(c) : '';
+      }).join('');
+      area.innerHTML = html || '<div class="empty">判例が見つかりませんでした</div>';
+      bindCaseTools(area);
+    }).catch(() => { area.innerHTML = '<div class="empty">判例を読み込めませんでした</div>'; });
+    return;
+  }
   if (savedTab === 'exam') {
     const ids = S.savedExam;
     if (!ids.length) {
@@ -1765,6 +1989,8 @@ applySet();
 renderLawGrid();
 renderSxChips();
 runSearch();
+renderCaseChips();
+renderCaseGrid();
 renderStudyChips();
 renderStudyGrid();
 renderTermChips();
@@ -1782,8 +2008,9 @@ $('#set-offline').addEventListener('click', async () => {
     note.textContent = 'この環境ではオフライン保存が使えません。https:// で開いているか確かめてください。';
     return;
   }
-  const files = METAS.map((m) => 'laws/' + m.key + '.js?v=6')
-    .concat(EXSETS.map((s) => 'exams/' + s.key + '.js?v=6'));
+  const files = METAS.map((m) => 'laws/' + m.key + '.js?v=7')
+    .concat(EXSETS.map((s) => 'exams/' + s.key + '.js?v=7'))
+    .concat(CGROUPS.map((g) => 'cases/' + g.id + '.js?v=7'));
   btn.disabled = true;
   let done = 0;
   try {

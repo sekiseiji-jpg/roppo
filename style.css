@@ -505,3 +505,60 @@ dialog::backdrop { background: rgba(12,15,28,.55); }
   #exam-result .row.wrap .spacer { display: none; }
   #exam-result .row.wrap .btn.primary { grid-column: 1 / -1; }
 }
+
+/* ========== 判例 ========== */
+.case-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px; margin-bottom: 11px; box-shadow: var(--shadow);
+  scroll-margin-top: 108px;
+}
+.case-card.hl { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.case-head { display: flex; gap: 9px; align-items: baseline; flex-wrap: wrap; }
+.case-name { font-weight: 700; font-size: 1.05rem; flex: 1 1 12em; min-width: 0; }
+.case-meta { font-size: .78rem; color: var(--muted); margin-top: 3px; }
+.case-meta b { color: var(--text); font-weight: 400; }
+.case-jiken { font-size: .74rem; color: var(--muted); margin-top: 2px; }
+
+.case-sec { margin-top: 11px; }
+.case-sec > .cs-h {
+  font-size: .74rem; letter-spacing: .08em; color: var(--accent); font-weight: 700;
+}
+.case-sec > .cs-b { font-size: .94rem; margin-top: 2px; white-space: pre-wrap; }
+.case-sec.official > .cs-b {
+  background: var(--surface2); border-left: 3px solid var(--border);
+  border-radius: 0 8px 8px 0; padding: 9px 12px;
+}
+.case-point { background: var(--primary-soft); border-radius: 9px; padding: 9px 12px; font-size: .93rem; }
+.case-point::before { content: '💡 '; }
+
+.case-refs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.ref-pill {
+  font: inherit; font-size: .82rem; cursor: pointer;
+  background: var(--surface2); color: var(--primary);
+  border: 1px solid var(--border); border-radius: 999px; padding: 3px 11px;
+}
+.ref-pill:hover { background: var(--primary-soft); border-color: var(--primary); }
+.ref-pill.gone { color: var(--muted); cursor: default; text-decoration: line-through; }
+.ref-pill.plain { color: var(--muted); cursor: default; }
+
+.case-exam {
+  font-size: .8rem; color: var(--muted); margin-top: 9px;
+  display: flex; flex-wrap: wrap; gap: 5px 9px; align-items: baseline;
+}
+.exam-pill {
+  font: inherit; font-size: .78rem; cursor: pointer;
+  background: var(--good-soft); color: var(--good); border: 1px solid var(--good);
+  border-radius: 999px; padding: 1px 9px;
+}
+
+.case-tools { display: flex; gap: 10px; margin-top: 11px; align-items: center; }
+
+/* 条文から判例へ */
+.art-cases { margin-top: 9px; display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.art-cases .ac-h { font-size: .76rem; color: var(--muted); }
+.case-pill {
+  font: inherit; font-size: .8rem; cursor: pointer; text-align: left;
+  background: var(--surface2); color: var(--accent);
+  border: 1px solid var(--accent); border-radius: 999px; padding: 2px 11px;
+}
+.case-pill:hover { background: var(--accent); color: #fff; }

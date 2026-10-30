@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
   <header class="app-header">
@@ -30,6 +30,7 @@
     <button class="tab" data-tab="study"><span class="ti">🎓</span><span class="tl">重要条文</span></button>
     <button class="tab" data-tab="terms"><span class="ti">📖</span><span class="tl">用語</span></button>
     <button class="tab" data-tab="quiz"><span class="ti">📝</span><span class="tl">クイズ</span></button>
+    <button class="tab" data-tab="cases"><span class="ti">⚖️</span><span class="tl">判例</span></button>
     <button class="tab" data-tab="exam"><span class="ti">🏛</span><span class="tl">過去問</span></button>
     <button class="tab" data-tab="stats"><span class="ti">📊</span><span class="tl">記録</span></button>
     <button class="tab" data-tab="saved"><span class="ti">⭐</span><span class="tl">保存</span></button>
@@ -131,6 +132,33 @@
         <div id="tm-chips" class="filter-row"></div>
       </div>
       <div id="tm-list" class="kw-list"></div>
+    </section>
+
+    <!-- ========== 判例 ========== -->
+    <section id="tab-cases" class="panel">
+      <div id="case-list-view">
+        <p class="lead">司法試験の短答式でよく問われる条文を中心に、重要判例を集めました。
+          判示事項・裁判要旨・参照法条は、裁判所ウェブサイトの公式データです。</p>
+        <div class="card tight">
+          <div class="row wrap">
+            <input id="cs-input" type="text" placeholder="🔍 判例をしぼりこむ（例：平等、表現、違憲）" autocomplete="off">
+          </div>
+          <div id="cs-law-chips" class="filter-row"></div>
+        </div>
+        <div id="case-grid" class="era-grid"></div>
+        <p class="muted small" id="case-source"></p>
+      </div>
+
+      <article id="case-detail-view" class="hidden">
+        <div class="detail-bar">
+          <button id="btn-case-back" class="btn ghost">← 分野一覧</button>
+          <span class="spacer"></span>
+          <button id="btn-case-prev" class="btn ghost" title="前の分野">◀</button>
+          <button id="btn-case-next" class="btn ghost" title="次の分野">▶</button>
+        </div>
+        <div id="case-hero" class="law-hero"></div>
+        <div id="case-body"></div>
+      </article>
     </section>
 
     <!-- ========== クイズ ========== -->
@@ -251,6 +279,7 @@
         <button class="savedtab active" data-sv="art">⭐ 条文</button>
         <button class="savedtab" data-sv="memo">📝 メモ</button>
         <button class="savedtab" data-sv="quiz">📒 問題</button>
+        <button class="savedtab" data-sv="case">⚖️ 判例</button>
         <button class="savedtab" data-sv="exam">🏛 過去問</button>
       </div>
       <div id="saved-area"></div>
@@ -325,9 +354,10 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="laws/index.js?v=6"></script>
-  <script src="exams/index.js?v=6"></script>
-  <script src="data-study.js?v=6"></script>
-  <script src="app.js?v=6"></script>
+  <script src="laws/index.js?v=7"></script>
+  <script src="exams/index.js?v=7"></script>
+  <script src="cases/index.js?v=7"></script>
+  <script src="data-study.js?v=7"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
