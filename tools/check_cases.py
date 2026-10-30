@@ -22,13 +22,20 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 def load_js(path):
-    s = open(path, encoding='utf-8').read()
-    return json.loads(s[s.index('=', s.index('window')) + 1:].strip().rstrip(';'))
+    """アプリの *.js データを読む。代入の形が2種類あるので、両方に対応する。
 
+        window.CASES_INDEX={...}
+        window.LAWDATA=window.LAWDATA||{};window.LAWDATA["minpo"]={...}
 
-def load_group(path):
-    s = open(path, encoding='utf-8').read()
-    return json.loads(s.split('=', 2)[2].strip().rstrip(';'))
+    「= のうしろがすぐ { か [ になっている最初の場所」が中身の始まり。
+    = の個数で数えると、片方の形で必ず落ちる。
+    """
+    with open(path, encoding='utf-8') as f:
+        src = f.read()
+    m = re.search(r'=\s*(?=[\[{])', src)
+    if not m:
+        raise ValueError('データの始まりが見つかりません: %s' % path)
+    return json.loads(src[m.end():].strip().rstrip(';'))
 
 
 # 日本語の文に出てきてはいけない字。ラテン文字の語、ハングル、キリル文字。
@@ -63,7 +70,7 @@ def main():
             k, _, n = r.partition(':')
             if k not in nums:
                 path = os.path.join(ROOT, 'laws', k + '.js')
-                nums[k] = ({a['num'] for a in load_group(path)['articles']}
+                nums[k] = ({a['num'] for a in load_js(path)['articles']}
                            if os.path.exists(path) else None)
             if nums[k] is None or n not in nums[k]:
                 miss += 1
@@ -76,7 +83,7 @@ def main():
     for g in sorted(glob.glob(os.path.join(ROOT, 'exams', '*.js'))):
         if g.endswith('index.js'):
             continue
-        for q in load_group(g)['questions']:
+        for q in load_js(g)['questions']:
             for r in q.get('refs') or []:
                 exam_refs[r] += 1
     idx_path = os.path.join(ROOT, 'cases', 'index.js')

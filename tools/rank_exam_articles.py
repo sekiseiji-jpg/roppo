@@ -14,14 +14,27 @@ import collections
 import glob
 import json
 import os
+import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def load_js(path):
+    """アプリの *.js データを読む。代入の形が2種類あるので、両方に対応する。
+
+        window.CASES_INDEX={...}
+        window.LAWDATA=window.LAWDATA||{};window.LAWDATA["minpo"]={...}
+
+    「= のうしろがすぐ { か [ になっている最初の場所」が中身の始まり。
+    = の個数で数えると、片方の形で必ず落ちる。
+    """
     with open(path, encoding='utf-8') as f:
-        return json.loads(f.read().split('=', 2)[2].strip().rstrip(';'))
+        src = f.read()
+    m = re.search(r'=\s*(?=[\[{])', src)
+    if not m:
+        raise ValueError('データの始まりが見つかりません: %s' % path)
+    return json.loads(src[m.end():].strip().rstrip(';'))
 
 
 def law_nums(key):

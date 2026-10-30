@@ -175,7 +175,8 @@ ART_RE = re.compile(r'(?P<num>[0-9]+|[〇一二三四五六七八九十百千]+)
 
 
 JUNK_RE = re.compile(r'^[\s()（）0-9,，～〜・]*$')
-PREFIX_RE = re.compile(r'^\([^)]*につき\)')
+# 「(1,2につき)」。コンマで切れて「2につき)」だけ残ることもあるので ( は無くてもよい
+PREFIX_RE = re.compile(r'^\(?[^()]*につき\)')
 
 
 def parse_refs(text):
@@ -190,9 +191,13 @@ def parse_refs(text):
     if not text:
         return []
     text = unicodedata.normalize('NFKC', text)
+    # 古い判例は「刑法37條」と旧字体で書かれている
+    text = text.replace('條', '条')
     out = []
-    # 区切りは全角コンマ・読点・改行
-    for part in re.split(r'[，,、\n]', text):
+    # 区切りは全角コンマ・読点・改行、そして全角空き
+    # （「(1,2につき)刑法130条前段　(2につき)憲法21条1項」のように空きで区切る判例がある。
+    #   NFKC のあとなので全角空きはただの空白になっている）
+    for part in re.split(r'[，,、\n\s]+', text):
         part = PREFIX_RE.sub('', part.strip()).strip()
         if not part or JUNK_RE.match(part):
             continue
@@ -202,7 +207,12 @@ def parse_refs(text):
                 law = LAW_BY_NAME[nm]
                 break
         if law is None:
-            # 前の項目と同じ法令が続いている場合（「憲法14条1項，1項」など）
+            if '法' in part or '令' in part:
+                # このアプリに入っていない法令（労働組合法など）。
+                # ここで前の法令を引き継ぐと、別の法律の条文に誤ってつながる。
+                out.append({'t': part})
+                continue
+            # 「憲法14条1項，1項」のように、法令名のない続きだけが前を引き継ぐ
             law = out[-1]['law'] if out and out[-1].get('law') else None
         m = ART_RE.search(part)
         if not m:
@@ -270,6 +280,23 @@ def resolve(case, force=False):
         return None, 'expect「%s」に合う行がない（その日の裁判例: %s）' % (case['expect'], sample)
     if len(hits) > 1 and case.get('jiken'):
         hits = [r for r in hits if case['jiken'] in r['text']] or hits
+    if len(hits) > 1 and case.get('cite'):
+        # 事件名では絞れなくても、判例集の巻号頁が分かっていれば機械に探させる。
+        # 詳細ページを順に見て、cite に合うものを選ぶ（最高裁判例に限り、12件まで）。
+        narrowed = []
+        for r in [x for x in hits if x['kind'] == '2'][:12]:
+            try:
+                d = fetch_detail(r['id'], r['kind'], force=force)
+            except SystemExit:
+                continue
+            if case['cite'] in (d.get('判例集等巻・号・頁') or ''):
+                narrowed.append((r, d))
+        if len(narrowed) == 1:
+            row, d = narrowed[0]
+            return (row, d), None
+        if len(narrowed) > 1:
+            sample = ' / '.join(r['text'][:48] for r, _ in narrowed)
+            return None, 'cite「%s」に合うものが%d件ある: %s' % (case['cite'], len(narrowed), sample)
     if len(hits) > 1:
         sample = ' / '.join(r['text'][:48] for r in hits)
         return None, '%d件に当たってしまう（jiken で事件番号を足して絞る: %s）' % (len(hits), sample)
